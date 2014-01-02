@@ -3,8 +3,8 @@ Smart Bits
 SmartBits is a watchface for the [Pebble](http://getpebble.com) smartwatch
 showing the time and date as rows and columns of bits.
 
-**Important**: This application will only run for the Pebbles using a 1.x SDK.
-For SDK 2.0, see master branch.
+**Important**: This application will only run for the Pebbles using a **1.x SDK**.
+For SDK **2.0+**, see [master branch](https://github.com/Gustave-Monod/SmartBits/tree/master).
 
 ![The watchface: lots of little dots](screenshot.png)
 
