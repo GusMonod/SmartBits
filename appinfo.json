@@ -1,0 +1,17 @@
+{
+  "uuid": "82c24e5c-868b-42d8-bfb3-57187dd35b2e",
+  "shortName": "Smart Bits",
+  "longName": "Smart Bits",
+  "companyName": "Gustave A. Monod",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": true
+  },
+  "appKeys": {
+    "dummy": 0
+  },
+  "resources": {
+    "media": []
+  }
+}
