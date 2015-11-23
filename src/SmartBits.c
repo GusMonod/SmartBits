@@ -20,11 +20,9 @@ enum Column { C_MONTH, C_MONTH_DAY, C_HOUR, C_MINUTE, C_SECOND };
 // App-specific data
 Window *window; // All apps must have at least one window
 
-// TODO change to a binary indicator
-TextLayer *battery_layer;
-
 // Layer containing all the circles (LEDs)
 Layer *led_layer;
+Layer *battery_layer;
 
 // Gets the center of a specific LED
 GPoint getCenter(int col, int row) {
@@ -90,14 +88,8 @@ void led_layer_update_callback(Layer *me, GContext *ctx) {
 }
 
 static void handle_battery(BatteryChargeState charge_state) {
-  static char battery_text[] = "100%";
-
-  if (charge_state.is_charging) {
-    snprintf(battery_text, sizeof(battery_text), "charging");
-  } else {
-    snprintf(battery_text, sizeof(battery_text), "%d%%", charge_state.charge_percent);
-  }
-  text_layer_set_text(battery_layer, battery_text);
+  // charge_state.charge_percent
+  // charge_state.is_charging
 }
 
 // Called once per second
@@ -135,12 +127,7 @@ static void do_init(void) {
   layer_set_update_proc(led_layer, &led_layer_update_callback);
   layer_add_child(root_layer, led_layer);
 
-  battery_layer = text_layer_create(GRect(SPACE, 114, /* width */ root_frame.size.w, 24 /* height */));
-  text_layer_set_text_color(battery_layer, GColorWhite);
-  text_layer_set_background_color(battery_layer, GColorClear);
-  text_layer_set_font(battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_text_alignment(battery_layer, GTextAlignmentLeft);
-  text_layer_set_text(battery_layer, "100%");
+  battery_layer = layer_create(root_frame);
 
   // Ensures time is displayed immediately (will break if NULL tick event accessed).
   // (This is why it's a good idea to have a separate routine to do the update itself.)
@@ -154,7 +141,7 @@ static void do_init(void) {
   handle_battery(battery_state_service_peek());
 
   layer_add_child(root_layer, led_layer);
-  layer_add_child(root_layer, text_layer_get_layer(battery_layer));
+  layer_add_child(root_layer, battery_layer);
 }
 
 static void do_deinit(void) {
@@ -162,7 +149,7 @@ static void do_deinit(void) {
   battery_state_service_unsubscribe();
 //  bluetooth_connection_service_unsubscribe();
   layer_destroy(led_layer);
-  text_layer_destroy(battery_layer);
+  layer_destroy(battery_layer);
   window_destroy(window);
 }
 
