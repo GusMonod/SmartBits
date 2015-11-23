@@ -22,6 +22,19 @@ static Layer *s_time_layer;
 
 // Layer showing the battery status
 static Layer *s_battery_layer;
+
+// Layer showing the connected status
+static Layer *s_connected_layer;
+
+// Current state of the battery (default 0%, not charging, not plugged)
+static BatteryChargeState s_battery_current = {
+  .charge_percent = 0,
+  .is_charging = false,
+  .is_plugged = false
+};
+
+// Current state of the phone connection (default false)
+static bool s_connected_current = false;
 // --------- End of globals
 
 // --------- Function definitions
@@ -29,10 +42,10 @@ static Layer *s_battery_layer;
 static void time_update(Layer *me, GContext *ctx);
 
 // Updates the battery layer when the battery changes
-static void battery_update(BatteryChargeState charge_state);
+static void battery_update(Layer *me, GContext *ctx);
 
 // Updates the connection status
-static void connection_status_update(bool connected);
+static void connected_update(Layer *me, GContext *ctx);
 
 // Gets the center of a specific LED
 static GPoint getCenter(int col, int row);
@@ -46,6 +59,18 @@ static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
   layer_mark_dirty(s_time_layer);
 }
 
+// Called when battery changes
+static void handle_battery(BatteryChargeState charge_state) {
+  s_battery_current = charge_state;
+  layer_mark_dirty(s_battery_layer);
+}
+
+// Called when connection status changes
+static void handle_connected(bool connected) {
+  s_connected_current = connected;
+  layer_mark_dirty(s_connected_layer);
+}
+
 // Handle the start-up of the app
 static void init(void) {
   // Create our app's base window
@@ -57,33 +82,46 @@ static void init(void) {
   GRect root_frame = layer_get_frame(root_layer);
 
   s_time_layer = layer_create(root_frame);
-  layer_set_update_proc(s_time_layer, &time_update);
-  layer_add_child(root_layer, s_time_layer);
-
   s_battery_layer = layer_create(root_frame);
-
-  // Ensures time is displayed immediately (will break if NULL tick event accessed).
-  // (This is why it's a good idea to have a separate routine to do the update itself.)
-  handle_second_tick(NULL /* unnecessary */ , SECOND_UNIT);
-
-  tick_timer_service_subscribe(SECOND_UNIT, &handle_second_tick);
-  battery_state_service_subscribe(&battery_update);
-  bluetooth_connection_service_subscribe(&connection_status_update);
-
-  // Before the battery changes, lets see what its value is:
-  battery_update(battery_state_service_peek());
+  s_connected_layer = layer_create(root_frame);
 
   layer_add_child(root_layer, s_time_layer);
   layer_add_child(root_layer, s_battery_layer);
+  layer_add_child(root_layer, s_connected_layer);
+
+  layer_set_update_proc(s_time_layer, &time_update);
+  layer_set_update_proc(s_connected_layer, &connected_update);
+  layer_set_update_proc(s_battery_layer, &battery_update);
+
+  tick_timer_service_subscribe(SECOND_UNIT, &handle_second_tick);
+  battery_state_service_subscribe(&handle_battery);
+  connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = &handle_connected
+  });
+
+  // Ensures time is displayed immediately (will break if NULL tick event accessed).
+  handle_second_tick(NULL, SECOND_UNIT);
+
+  // Check initial battery status
+  handle_battery(battery_state_service_peek());
+
+  // Check initial connected status
+  handle_connected(connection_service_peek_pebble_app_connection());
+
+  // Before the battery changes, lets see what its value is:
+  // handle_connected();
 }
 
 // Handle the destruction of the app
 static void deinit(void) {
-  tick_timer_service_unsubscribe();
+  bluetooth_connection_service_unsubscribe();
   battery_state_service_unsubscribe();
-//  bluetooth_connection_service_unsubscribe();
-  layer_destroy(s_time_layer);
+  tick_timer_service_unsubscribe();
+
+  layer_destroy(s_connected_layer);
   layer_destroy(s_battery_layer);
+  layer_destroy(s_time_layer);
+
   window_destroy(s_window);
 }
 
@@ -105,7 +143,7 @@ static void time_update(Layer *me, GContext *ctx) {
                  hour         = !is_24h_style && 0 == hour ? 12 : hour;
   bool           pm           = t->tm_hour / 12;
   unsigned short month        = t->tm_mon + 1;
-  unsigned short week_day     = 0 != t->tm_wday ? t->tm_wday : 7;// 0 as 7
+  unsigned short week_day     = 0 != t->tm_wday ? t->tm_wday : 7;  // 0 as 7
 
   toggle_led(ctx, kSecondColumn, 0, t->tm_sec & 1);
   toggle_led(ctx, kSecondColumn, 1, t->tm_sec & 2);
@@ -147,13 +185,14 @@ static void time_update(Layer *me, GContext *ctx) {
 }
 
 // See top of this file
-static void battery_update(BatteryChargeState charge_state) {
+static void battery_update(Layer *me, GContext *ctx) {
   // charge_state.charge_percent
   // charge_state.is_charging
 }
 
 // See top of this file
-static void connection_status_update(bool connected) {
+static void connected_update(Layer *me, GContext *ctx) {
+  toggle_led(ctx, 0, 4, s_connected_current);
 //  graphics_context_set_fill_color(ctx, GColorWhite);
 //  GPoint center = GPoint(0,0);
 //  graphics_fill_circle(ctx)
