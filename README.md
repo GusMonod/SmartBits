@@ -3,10 +3,19 @@ Smart Bits
 SmartBits is a watchface for the [Pebble](http://getpebble.com) smartwatch
 showing the time and date as rows and columns of bits.
 
-**Important**: This application will only run for the Pebbles using a **2.0+** SDK.
+It is available for Pebble Original/Steel, and for Pebble Time (not Time Round).
+
+**Important**: This application will run for the Pebbles using a **2.0** or **3.0** SDK.
 For SDK **1.x**, see [SDK-1.x branch](https://github.com/Gustave-Monod/SmartBits/tree/SDK-1.x).
 
 ![The watchface: lots of little dots](screenshot.png)
+
+## How to install
+
+Check out [cloudpebble.net](https://cloudpebble.net) and create a new 3.0 empty
+project. Add a new file with the content of
+[`src/SmartBits.c`](https://github.com/GusMonod/SmartBits/blob/master/src/SmartBits.c)
+and build for aplite (Pebble Original/Steel) and/or basalt (Pebble Time).
 
 ## How to read
 
@@ -25,7 +34,6 @@ The display also works in 24 hour mode
 ## Distribution
 
 Provided "as is". *No warranties*!
-
 
 If you use the sources of this repo as base for your own watchface/app:
 
