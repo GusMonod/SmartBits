@@ -17,26 +17,84 @@ enum Column { C_MONTH, C_MONTH_DAY, C_HOUR, C_MINUTE, C_SECOND };
 
 // --------- End of definition of global constants
 
-// App-specific data
-Window *window; // All apps must have at least one window
+Window *window;
 
 // Layer containing all the circles (LEDs)
 Layer *led_layer;
+
+// Layer showing the battery status
 Layer *battery_layer;
 
+// Updates the layer containing all LEDs when the time changes
+static void time_update(Layer *me, GContext *ctx);
+
+// Updates the battery layer when the battery changes
+static void battery_update(BatteryChargeState charge_state);
+
+// Updates the connection status
+static void connection_status_update(bool connected);
+
 // Gets the center of a specific LED
-GPoint getCenter(int col, int row) {
-  return GPoint(DOT_RADIUS * (1 + 2 * col) + SPACE * col + SPACE,
-                DOT_RADIUS * (1 + 2 * row) + SPACE * row + SPACE / 2);
+static GPoint getCenter(int col, int row);
+
+// Changes the state of a given LED to on (on=true) or off (on=false)
+static void toggle_led(GContext *ctx, int col, int row, bool on);
+
+// Called once per second
+static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
+  layer_mark_dirty(led_layer);
 }
 
-// Toggles the state of a given LED
-void toggle_led(GContext *ctx, int col, int row, bool on) {
-  graphics_context_set_fill_color(ctx, on ? GColorWhite : GColorBlack);
-  graphics_fill_circle(ctx, getCenter(col, row), DOT_RADIUS);
+// Handle the start-up of the app
+static void init(void) {
+  // Create our app's base window
+  window = window_create();
+  window_stack_push(window, true /* Animated */);
+  window_set_background_color(window, GColorBlack);
+
+  Layer *root_layer = window_get_root_layer(window);
+  GRect root_frame = layer_get_frame(root_layer);
+
+  led_layer = layer_create(root_frame);
+  layer_set_update_proc(led_layer, &time_update);
+  layer_add_child(root_layer, led_layer);
+
+  battery_layer = layer_create(root_frame);
+
+  // Ensures time is displayed immediately (will break if NULL tick event accessed).
+  // (This is why it's a good idea to have a separate routine to do the update itself.)
+  handle_second_tick(NULL /* unnecessary */ , SECOND_UNIT);
+
+  tick_timer_service_subscribe(SECOND_UNIT, &handle_second_tick);
+  battery_state_service_subscribe(&battery_update);
+  bluetooth_connection_service_subscribe(&connection_status_update);
+
+  // Before the battery changes, lets see what its value is:
+  battery_update(battery_state_service_peek());
+
+  layer_add_child(root_layer, led_layer);
+  layer_add_child(root_layer, battery_layer);
 }
 
-void led_layer_update_callback(Layer *me, GContext *ctx) {
+// Handle the destruction of the app
+static void deinit(void) {
+  tick_timer_service_unsubscribe();
+  battery_state_service_unsubscribe();
+//  bluetooth_connection_service_unsubscribe();
+  layer_destroy(led_layer);
+  layer_destroy(battery_layer);
+  window_destroy(window);
+}
+
+// The main event/run loop for our app
+int main(void) {
+  init();
+  app_event_loop();
+  deinit();
+}
+
+// See top of this file
+static void time_update(Layer *me, GContext *ctx) {
   // Gets the time
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
@@ -87,75 +145,27 @@ void led_layer_update_callback(Layer *me, GContext *ctx) {
 
 }
 
-static void handle_battery(BatteryChargeState charge_state) {
+// See top of this file
+static void battery_update(BatteryChargeState charge_state) {
   // charge_state.charge_percent
   // charge_state.is_charging
 }
 
-// Called once per second
-static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
-  layer_mark_dirty(led_layer);
-}
-
-static void connection_layer_update_callback(Layer *me, GContext* ctx) {
+// See top of this file
+static void connection_status_update(bool connected) {
 //  graphics_context_set_fill_color(ctx, GColorWhite);
 //  GPoint center = GPoint(0,0);
 //  graphics_fill_circle(ctx)
 }
 
-static void handle_bluetooth(bool connected) {
-//  static bool previous_state = connected;
-//  if (previous_state != connected) {
-//    set_dirty
-//  }
-  // check if bluetooth is on
-//  text_layer_set_text(connection_layer, connected ? "connected" : "disconnected");
-//  previous_state = connected;
+// See top of this file
+static GPoint getCenter(int col, int row) {
+  return GPoint(DOT_RADIUS * (1 + 2 * col) + SPACE * col + SPACE,
+                DOT_RADIUS * (1 + 2 * row) + SPACE * row + SPACE / 2);
 }
 
-// Handle the start-up of the app
-static void do_init(void) {
-  // Create our app's base window
-  window = window_create();
-  window_stack_push(window, true /* Animated */);
-  window_set_background_color(window, GColorBlack);
-
-  Layer *root_layer = window_get_root_layer(window);
-  GRect root_frame = layer_get_frame(root_layer);
-
-  led_layer = layer_create(root_frame);
-  layer_set_update_proc(led_layer, &led_layer_update_callback);
-  layer_add_child(root_layer, led_layer);
-
-  battery_layer = layer_create(root_frame);
-
-  // Ensures time is displayed immediately (will break if NULL tick event accessed).
-  // (This is why it's a good idea to have a separate routine to do the update itself.)
-  handle_second_tick(NULL /* unnecessary */ , SECOND_UNIT);
-
-  tick_timer_service_subscribe(SECOND_UNIT, &handle_second_tick);
-  battery_state_service_subscribe(&handle_battery);
-//  bluetooth_connection_service_subscribe(&handle_bluetooth);
-
-  // Before the battery changes, lets see what its value is:
-  handle_battery(battery_state_service_peek());
-
-  layer_add_child(root_layer, led_layer);
-  layer_add_child(root_layer, battery_layer);
-}
-
-static void do_deinit(void) {
-  tick_timer_service_unsubscribe();
-  battery_state_service_unsubscribe();
-//  bluetooth_connection_service_unsubscribe();
-  layer_destroy(led_layer);
-  layer_destroy(battery_layer);
-  window_destroy(window);
-}
-
-// The main event/run loop for our app
-int main(void) {
-  do_init();
-  app_event_loop();
-  do_deinit();
+// See top of this file
+static void toggle_led(GContext *ctx, int col, int row, bool on) {
+  graphics_context_set_fill_color(ctx, on ? GColorWhite : GColorBlack);
+  graphics_fill_circle(ctx, getCenter(col, row), DOT_RADIUS);
 }
